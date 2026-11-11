@@ -1,0 +1,150 @@
+/* NHIS 제공 SAS 테이블 작업의 작성 스타일을 보여 주는 WORK 전용 MOCK이다.
+   아래 변수·값·01/02 월 표지는 모두 가상이며 실제 NHIS 스키마나 연구 정의가 아니다.
+   실제 적용에는 현재 프로젝트 지침, 승인 SAP, 실제 스키마·기간·키 범위가 필요하다.
+   새 SAS 세션에서 위부터 실행한다. 부분 실행에는 앞 블록의 표와 QC가 필요하다.
+   재실행은 이 예제의 WORK 출력만 다시 만든다. 입력표를 제자리 변환하지 않는다.
+   일수는 가상 기준일부터 센 정수이며 양 끝 포함으로 계산한다. 실제 일수 정의는 SAP를 따른다.
+   기대 건수·합계는 MOCK 전용이다. SAS 컴파일·실행·실자료 검증은 미실시다.
+   스타일 출처: sas_code_all.docx P24-42, P173-190, P712-728, P23968-23973.
+   원문의 연구값·상병·경로·무조건 중복 제거는 옮기지 않았다. */
+
+/* 모의 입력: 한 행은 청구 1건, claim_id는 이 MOCK 전체에서 유일하다. */
+data work.style_raw;
+    length claim_id person_id $3 source_month $2;
+    input claim_id $ person_id $ source_month $ take_row start_day end_day amount;
+    datalines;
+C01 P01 01 1 1 3 10
+C02 P01 01 1 5 5 20
+C03 P03 01 0 2 4 99
+C04 P01 02 1 32 34 30
+C05 P02 02 1 33 33 40
+;
+run;
+proc sql;
+    create table work.style_raw_qc as
+    select count(*) as n, count(distinct claim_id) as n_key,
+           sum(cmiss(claim_id,person_id,source_month,take_row,start_day,end_day,amount)>0) as miss,
+           sum(start_day<1 or end_day<start_day or take_row not in (0,1)
+               or source_month not in ('01','02')) as bad
+    from work.style_raw;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_raw_qc;
+    if n ne 5 or n_key ne n or miss ne 0 or bad ne 0 then abort cancel;
+run;
+
+/* 1. 필요한 열과 조건을 직접 적는다. take_row=1은 이 MOCK의 선택 조건이다. */
+proc sql;
+    create table work.style_pick as
+    select claim_id, person_id, source_month, start_day, end_day, amount
+    from work.style_raw
+    where take_row=1;
+quit;
+proc sql;
+    create table work.style_pick_qc as
+    select count(*) as n, count(distinct claim_id) as n_key,
+           count(distinct person_id) as n_person,
+           sum(cmiss(claim_id,person_id,start_day,end_day,amount)>0) as miss
+    from work.style_pick;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_pick_qc;
+    if n ne 4 or n_key ne n or n_person ne 2 or miss ne 0 then abort cancel;
+run;
+
+/* 2. 사람별 건수를 만든 뒤 청구에 붙인다. 집계표는 사람당 1행이다. */
+proc sql;
+    create table work.style_person as
+    select person_id, count(*) as n_claim, sum(amount) as total_amount
+    from work.style_pick
+    group by person_id;
+quit;
+proc sql;
+    create table work.style_person_qc as
+    select count(*) as n, count(distinct person_id) as n_key,
+           sum(n_claim) as claims, sum(total_amount) as amount
+    from work.style_person;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_person_qc;
+    if n ne 2 or n_key ne n or claims ne 4 or amount ne 100 then abort cancel;
+run;
+/* 청구:사람 집계는 N:1이다. 왼쪽 청구를 보존하고 연결 누락·행 증식을 확인한다. */
+proc sql;
+    create table work.style_join as
+    select a.claim_id, a.person_id, a.source_month, a.start_day, a.end_day,
+           a.amount, b.n_claim
+    from work.style_pick as a
+    left join work.style_person as b on a.person_id=b.person_id;
+quit;
+proc sql;
+    create table work.style_join_qc as
+    select count(*) as n, count(distinct claim_id) as n_key,
+           sum(missing(n_claim)) as unmatched, sum(amount) as amount
+    from work.style_join;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_join_qc;
+    if n ne 4 or n_key ne n or unmatched ne 0 or amount ne 100 then abort cancel;
+run;
+
+/* 3. 양 끝을 포함한 일수: 같은 날은 1일, 결측·역전은 0으로 바꾸지 않는다. */
+data work.style_days;
+    set work.style_join;
+    days=.;
+    if nmiss(start_day,end_day)=0 and end_day>=start_day then days=end_day-start_day+1;
+run;
+proc means data=work.style_days n nmiss min max sum;
+    var days;
+    output out=work.style_days_qc n=n nmiss=miss min=min_days max=max_days sum=total_days;
+run;
+data _null_;
+    if &syserr>4 or &syscc>4 then abort cancel;
+    set work.style_days_qc;
+    if n ne 4 or miss ne 0 or min_days ne 1 or max_days ne 3 or total_days ne 8 then abort cancel;
+run;
+proc freq data=work.style_days;
+    tables days / missing;
+run;
+
+/* 4. 반복만 작은 매크로로 쓴다. 앞의 작은 표를 읽고 출력 월만 다시 만든다.
+   source_month는 출처 표지이며 실제 진료일 조건을 대신하지 않는다. */
+%macro style_month(mm,expected_n);
+proc sql;
+    create table work.style_m&mm as
+    select claim_id, person_id, source_month, start_day, end_day, amount
+    from work.style_pick
+    where source_month="&mm";
+    create table work.style_mq&mm as
+    select count(*) as n, count(distinct claim_id) as n_key,
+           sum(cmiss(claim_id,person_id,source_month,start_day,end_day,amount)>0) as miss
+    from work.style_m&mm;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_mq&mm;
+    if n ne &expected_n or n_key ne n or miss ne 0 then abort cancel;
+run;
+%mend;
+%style_month(01,2);
+%style_month(02,2);
+/* 같은 스키마의 두 월을 취합한다. 재실행 때 APPEND하지 않으며 사람 수는 다시 센다. */
+data work.style_months;
+    set work.style_m01 work.style_m02;
+run;
+proc sql;
+    create table work.style_months_qc as
+    select count(*) as n, count(distinct claim_id) as n_key,
+           count(distinct person_id) as n_person, count(distinct source_month) as months,
+           sum(amount) as amount
+    from work.style_months;
+quit;
+data _null_;
+    if &sqlrc ne 0 or &syscc>4 then abort cancel;
+    set work.style_months_qc;
+    if n ne 4 or n_key ne n or n_person ne 2 or months ne 2 or amount ne 100 then abort cancel;
+run;
