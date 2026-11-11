@@ -1,0 +1,141 @@
+/* NHIS 제공 SAS 테이블용 기본틀 | 2026-11-04
+   기본 상태는 WORK 모의자료만 사용한다. Tibero/ODBC 추출 코드가 아니다.
+   실제 월별 파일명, 키의 자료형·길이, 날짜 저장형은 PROC CONTENTS로 확인한다.
+   기준일·관찰기간·상병/약물·제외·중복 처리와 한 행의 단위는 연구계획에 따른다.
+   월별 파일만 바뀌는 작업은 월 반복 매크로로 묶고, SQL은 한곳에 둔다.
+   실자료는 승인된 소문자 경로에 읽기 전용 연결한다. 저장은 승인된 위치만 사용한다.
+   원천·기존 결과를 덮어쓰거나 개별 ID·명세서·날짜를 반출하지 않는다.
+   생성 직후 QC를 보고 다음 블록을 실행한다. DONE은 연구 검증 완료가 아니다. */
+
+/* 00 | 모의 입력: 대상자, T20 명세서, T40 진단 상세.
+   service_day는 예시 숫자다. 실자료는 확인된 날짜 저장형을 먼저 표준화한다. */
+%let example_start=10;
+%let example_end=20;
+%macro nhis_example_ok;
+  %if &syserr>4 or &syscc>4 or &sqlrc ne 0 %then %do;
+    %put ERROR: [NHIS_BLOCK] CHECK_PRECEDING_LOG;
+    %abort cancel;
+  %end;
+%mend;
+data work.nhis_ex_people;
+  length id $4;
+  input id $;
+  datalines;
+A
+B
+C
+;
+run;
+data work.nhis_ex_t20;
+  length id $4 cmn_key $8;
+  input id $ cmn_key $ service_day;
+  datalines;
+A C01 10
+A C02 11
+B C03 12
+D C04 13
+B C05 30
+C C06 14
+;
+run;
+data work.nhis_ex_t40;
+  length cmn_key $8 dx_code $12;
+  input cmn_key $ dx_code $;
+  datalines;
+C01 DEMO_A
+C01 OTHER
+C02 DEMO_A
+C04 DEMO_A
+C05 DEMO_A
+C99 DEMO_A
+;
+run;
+
+/* 01 | 대상자 명세서
+   입력: nhis_ex_t20, nhis_ex_people. 연결: 환자 id.
+   조건: 대상자이며 예시 기간인 명세서. 출력: nhis_ex_claim, 명세서당 한 행.
+   QC: 키 결측·중복은 검사하되 DISTINCT로 숨기지 않는다. */
+%put NOTE: [NHIS_BLOCK] BEGIN 01 CLAIM;
+proc sql;
+  create table work.nhis_ex_claim as
+  select a.id,a.cmn_key,a.service_day
+  from work.nhis_ex_t20 as a
+    inner join work.nhis_ex_people as p on a.id=p.id
+  where a.service_day between &example_start. and &example_end.;
+
+  create table work.nhis_ex_claim_qc as
+  select count(*) as n_rows,count(distinct id) as n_people,
+         coalesce(sum(case when missing(id) or missing(cmn_key) then 1 else 0 end),0) as n_missing_key,
+         count(cmn_key)-count(distinct cmn_key) as n_duplicate_claim_rows
+  from work.nhis_ex_claim;
+quit;
+%nhis_example_ok;
+data _null_;
+  set work.nhis_ex_claim_qc;
+  put 'NOTE: [NHIS_QC] CLAIM ' n_rows= n_people= n_missing_key= n_duplicate_claim_rows=;
+  if n_missing_key>0 or n_duplicate_claim_rows>0 then do;
+    put 'ERROR: [NHIS_QC] CLAIM_KEY_CONTRACT_FAILED';
+    abort cancel;
+  end;
+run;
+%nhis_example_ok;
+%put NOTE: [NHIS_BLOCK] DONE 01 CLAIM;
+
+/* 02 | 진단 상세에 환자·날짜 붙이기
+   입력: nhis_ex_t40, nhis_ex_claim. 연결: 명세서 cmn_key.
+   조건: 예시 코드 DEMO_. 출력: nhis_ex_dx, 연결된 진단 상세 행.
+   QC의 미연결에는 대상자·기간 밖 기록도 포함된다. 진단 상세의 다행은 허용한다. */
+%put NOTE: [NHIS_BLOCK] BEGIN 02 DX;
+proc sql;
+  create table work.nhis_ex_dx as
+  select h.id,h.cmn_key,h.service_day,d.dx_code
+  from work.nhis_ex_t40 as d
+    inner join work.nhis_ex_claim as h on d.cmn_key=h.cmn_key
+  where substr(d.dx_code,1,5)='DEMO_';
+
+  create table work.nhis_ex_dx_qc as
+  select count(*) as n_code_rows,count(h.cmn_key) as n_linked_rows,
+         count(*)-count(h.cmn_key) as n_not_in_selected_claims,
+         count(distinct h.id) as n_people
+  from work.nhis_ex_t40 as d
+    left join work.nhis_ex_claim as h on d.cmn_key=h.cmn_key
+  where substr(d.dx_code,1,5)='DEMO_';
+quit;
+%nhis_example_ok;
+data _null_;
+  set work.nhis_ex_dx_qc;
+  put 'NOTE: [NHIS_QC] DX ' n_code_rows= n_linked_rows= n_not_in_selected_claims= n_people=;
+run;
+%nhis_example_ok;
+%put NOTE: [NHIS_BLOCK] DONE 02 DX;
+
+/* 03 | 환자별 요약
+   입력: 대상자 목록, 진단 상세. 연결: 환자 id.
+   LEFT JOIN으로 진단 미포착 대상자도 유지한다. 미포착은 질병 없음과 다르다.
+   출력: nhis_ex_person, 환자당 한 행. QC는 환자 수·중복·미포착을 확인한다. */
+%put NOTE: [NHIS_BLOCK] BEGIN 03 PERSON;
+proc sql;
+  create table work.nhis_ex_person as
+  select p.id,min(d.service_day) as first_dx_day,count(d.cmn_key) as n_dx_rows
+  from work.nhis_ex_people as p
+    left join work.nhis_ex_dx as d on p.id=d.id
+  group by p.id;
+
+  create table work.nhis_ex_person_qc as
+  select count(*) as n_rows,count(distinct id) as n_people,
+         count(id)-count(distinct id) as n_duplicate_id_rows,
+         coalesce(sum(case when missing(first_dx_day) then 1 else 0 end),0) as n_without_captured_dx
+  from work.nhis_ex_person;
+quit;
+%nhis_example_ok;
+data _null_;
+  set work.nhis_ex_person_qc;
+  put 'NOTE: [NHIS_QC] PERSON ' n_rows= n_people= n_duplicate_id_rows= n_without_captured_dx=;
+run;
+%nhis_example_ok;
+%put NOTE: [NHIS_BLOCK] DONE 03 PERSON;
+
+/* 모의 기대값: CLAIM 4행/3명, DX 후보 5행/연결 2행/미연결 3행,
+   PERSON 3행/3명/중복 0행/미포착 2명. 실제 연구의 기준값으로 사용하지 않는다.
+   실자료 적용 시 입력 스키마·출력 충돌을 확인하고 변경 전후 행수·고유인·연결률과
+   주요 분포를 비교한다. 원천/개인 QC는 서버에 두고 반출 심사는 별도로 진행한다. */

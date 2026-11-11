@@ -1,0 +1,4 @@
+interface:
+  display_name: "claim-research"
+  short_description: "Route and verify NHIS HIRA claims research safely"
+  default_prompt: "Use $claim-research to route this claims task, verify its data-source semantics, and retain only safe validated lessons."
