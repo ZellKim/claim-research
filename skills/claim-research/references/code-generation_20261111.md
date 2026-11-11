@@ -59,24 +59,15 @@ NHIS는 [의미와 단계](nhis-semantic-layer.md), [근거와 적용 범위](nh
 
 기존 연구의 승인된 입출력·모형·공변량·가중치·시드와 패키지 조건을 먼저 읽는다. 이 사용자의 기본 작성 방식은 data.table 중심이며, 단순 분류는 조건별 `DT[조건, 변수 := 값]`으로 보이게 쓴다. `%>%`, fcase/fifelse, 일회성 함수·반복문으로 간단한 조건을 감추지 않는다. 기존 함수를 단지 짧게 만들기 위해 삭제하지 않는다.
 
-다음은 임상 정의가 없는 합성 문법 예제다.
+먼저 [짧은 R 스타일 대표본](../assets/reference_code_style/nhis_r_style_20261111.R)을 읽는다. `data.table`만 사용하는 합성 실행 예제로 입력 → 키 QC → 기준표를 유지하는 연결 → 조건별 대입 → QC → 분모가 보이는 요약을 보여 준다. 외부 원문·입력·경로 없이 읽거나 시험할 수 있으며 NHIS 실제 스키마·임상 정의를 제공하지 않는다.
 
-```r
-library(data.table)
-DT <- data.table(value = c(NA_real_, -1, 0, 1))
-DT[, value_class := NA_character_]
-DT[is.na(value), value_class := "missing"]
-DT[!is.na(value) & value < 0, value_class := "negative"]
-DT[!is.na(value) & value == 0, value_class := "zero"]
-DT[!is.na(value) & value > 0, value_class := "positive"]
-stopifnot(!anyNA(DT$value_class))
-```
+원본 단계가 필요하면 `copy()`로 보존하고, 응답 결측과 미매칭을 별도 표시한다. 표 전체의 NA를 0으로 바꾸거나 행 위치에 의존해 결과를 붙이지 않는다. 필요한 원문은 접근 가능한 관리 라이브러리에서 해당 구간만 확인한다.
 
 실제 join의 관계·키 중복·NA 처리, 그룹화·정렬·분모를 검증한다. baseline/Table 1, 매칭, KM/Cox, 하위집단·다중검정의 조건은 현재 SAP로 정한다. 다른 연구 예제의 임계값·매칭 비율·질환군·모형을 기본값으로 가져오지 않는다. 상대 입출력은 실행 작업 폴더 기준일 수 있으므로 source 파일의 보관 위치와 실제 작업 폴더를 구분한다.
 
 ## 7. 전달 전 검사와 검증 수준
 
-현재 프로젝트의 정적 검사기와 해당 연구의 검사를 우선한다. 별도 검사기가 없으면 번들 [validate_sas_preflight.py](../scripts/validate_sas_preflight.py)를 사용한다. Python 표준 라이브러리만 필요하며 SAS를 실행하거나 원자료를 읽지 않는다. 아래 경로는 설치된 claim-research 폴더를 기준으로 한다.
+현재 프로젝트의 정적 검사기와 해당 연구의 검사를 우선한다. SAS/TXT 전달 파일에 별도 SAS 검사기가 없으면 번들 [validate_sas_preflight.py](../scripts/validate_sas_preflight.py)를 사용한다. Python 표준 라이브러리만 필요하며 SAS를 실행하거나 원자료를 읽지 않는다. 아래 경로는 설치된 claim-research 폴더를 기준으로 한다. R 대표본은 SAS 검사기에 넣지 않는다. R에서는 구문 확인과 합성 예제 실행을 구분하며, 연구 코드는 해당 입력·SAP에 맞춘 QC를 별도로 수행한다.
 
 ```text
 python -B -X utf8 scripts/validate_sas_preflight.py <전달파일1.txt> <전달파일2.txt> --json

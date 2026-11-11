@@ -50,8 +50,8 @@ Codex는 스킬 변경을 자동으로 감지합니다. 목록에 나타나지 �
 
 1. [SKILL.md](skills/claim-research/SKILL.md)에서 자료원과 작업 단계를 선택합니다.
 2. 현재 프로젝트의 코드 작성 안내를 읽습니다. 별도 안내가 없으면 SKILL.md의 탐색 순서에 따라 접근 가능한 관리 라이브러리를 확인하고, 없으면 [번들 코드생성 안내](skills/claim-research/references/code-generation_20261111.md)를 사용합니다.
-3. 선택한 경로의 `references/`를 읽습니다. **NHIS 제공 SAS 테이블 가공**은 [150줄 SAS 스타일 대표본](skills/claim-research/assets/reference_code_style/nhis_sas_style_20261111.txt)을 먼저 참고합니다. 짧은 목적 주석, 직접 SQL/DATA, 즉시 QC와 작은 반복 매크로를 WORK 합성 자료로 보여 줍니다. 오류 중단·진행 표시 등 추가 QC 구현은 [30 WORK 모의자료 템플릿](skills/claim-research/assets/sas_templates/30_NHIS_proc_sql_block_qc_template.txt)에서 필요한 부분을 확인합니다. R 작성 방식은 번들 코드생성 안내의 합성 예제를 참고합니다.
-4. [SAS 정적 검사기](skills/claim-research/scripts/validate_sas_preflight.py)는 해당 프로젝트의 요구에 맞는 정확한 전달 파일에 적용합니다. 사용 방법과 적용 범위는 번들 코드생성 안내를 따릅니다. [검사기 테스트](skills/claim-research/scripts/tests/test_validate_sas_preflight.py)는 정적 검사 기능을 확인하기 위한 자료입니다.
+3. 선택한 경로의 `references/`를 읽습니다. **NHIS 제공 SAS 테이블 가공**은 [150줄 SAS 스타일 대표본](skills/claim-research/assets/reference_code_style/nhis_sas_style_20261111.txt)을 먼저 참고합니다. 짧은 목적 주석, 직접 SQL/DATA, 즉시 QC와 작은 반복 매크로를 WORK 합성 자료로 보여 줍니다. 오류 중단·진행 표시 등 추가 QC 구현은 [30 WORK 모의자료 템플릿](skills/claim-research/assets/sas_templates/30_NHIS_proc_sql_block_qc_template.txt)에서 필요한 부분을 확인합니다. **R 작성**은 [109줄 R 스타일 대표본](skills/claim-research/assets/reference_code_style/nhis_r_style_20261111.R)을 먼저 참고합니다. `data.table`로 입력 확인, 키·연결 QC, 조건별 `:=` 대입과 분모가 보이는 요약을 합성 자료로 보여 줍니다. 매칭·KM/Cox는 현재 연구 SAP에 맞춰 필요한 상세 참고만 확인합니다.
+4. [SAS 정적 검사기](skills/claim-research/scripts/validate_sas_preflight.py)는 해당 프로젝트의 요구에 맞는 정확한 전달 파일에 적용합니다. 사용 방법과 적용 범위는 번들 코드생성 안내를 따릅니다. R 파일에는 이 SAS 검사기를 적용하지 않으며, R 구문·합성자료 실행과 해당 연구의 실자료 QC를 구분합니다. [검사기 테스트](skills/claim-research/scripts/tests/test_validate_sas_preflight.py)는 정적 검사 기능을 확인하기 위한 자료입니다.
 
 템플릿은 연구기간·대상자·변수·코드셋·분석모형의 승인 근거가 아닙니다. 모의자료 예제는 실제 연구 데이터에 대한 검증을 대신하지 않습니다. 정적 검사 통과, SAS/R 실행 성공, 실제 결과의 정확성과 재현성 확인을 구분하고 수행하지 못한 검증은 명시합니다.
 
@@ -59,11 +59,10 @@ Codex는 스킬 변경을 자동으로 감지합니다. 목록에 나타나지 �
 
 ## 공통 기능과 연구별 자료의 경계
 
-번들은 자료원 선택, 코드 작성 원칙, WORK 모의자료 템플릿과 정적 검사를 제공합니다. 로컬 연구 라이브러리에서 관리하는 **원주 추출 17파일, 연구별 예제 25파일과 원문 Word의 읽기용 분할본은 포함하지 않습니다.** 새 SAS 스타일 대표본은 원문의 작성 패턴을 합성 자료로 재구성한 독립 예제이며, 원문이나 분할본 없이 사용할 수 있습니다. 00·10·20 SAS 템플릿도 배포하지 않습니다. 실제 서버 설정·추출 조건·연구 정의가 필요한 작업은 현재 프로젝트의 승인 자료와 로컬 라이브러리를 확인해야 합니다.
+번들은 자료원 선택, 코드 작성 원칙, WORK 모의자료 템플릿과 정적 검사를 제공합니다. 로컬 연구 라이브러리에서 관리하는 **원주 추출 17파일, 연구별 예제 22파일과 원문 Word의 읽기용 분할본은 포함하지 않습니다.** SAS·R 스타일 대표본은 작성 패턴을 합성 자료로 재구성한 독립 예제이며, 연구 원문이나 읽기용 분할본 없이 사용할 수 있습니다. R 대표본은 메모리 안의 합성자료만 사용하며 실행에는 R과 `data.table`이 필요합니다. 00·10·20 SAS 템플릿도 배포하지 않습니다. 실제 서버 설정·추출 조건·연구 정의가 필요한 작업은 현재 프로젝트의 승인 자료와 로컬 라이브러리를 확인해야 합니다.
 
 연구별 코드가 필요할 때는 프로젝트 안내가 가리키는 자료만 찾아 참고합니다. 예제의 연구기간·서버 경로·대상자 필터·삭제 구문을 그대로 채택하지 않으며, 로컬 자료가 없다는 이유로 전체 Drive를 검색하지 않습니다. 필요한 환경·스키마·승인 기준이 없으면 그 정보에 의존하는 실행 코드를 확정하지 않습니다.
 
 ## 공개 범위
 
 이 저장소는 재사용 가능한 스킬과 코드 작성·검증 자료를 배포합니다. 연구 원자료, 연구별 완성 산출물, 개인 컴퓨터의 경로 설정은 배포 대상이 아닙니다. 설치 환경에서 생성되는 `runtime-context.json`과 `.canonical-manifest.json`도 공개 번들에 포함하지 않습니다.
-
