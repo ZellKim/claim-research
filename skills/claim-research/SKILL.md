@@ -1,13 +1,13 @@
 ---
 name: claim-research
-description: Use when working on NHIS/국민건강보험공단 or HIRA/심평원 claims-data SAS/R extraction, analysis, errors, cohort construction, QC, or research workflow.
+description: Use when working on NHIS/국민건강보험공단 or HIRA/심평원 claims-data research design, variable/code lists, data applications, SAS/R extraction, analysis, errors, cohort construction, or QC.
 ---
 
 # claim-research
 
 ## Trigger and scope
 
-Apply this skill to NHIS or HIRA claims-data research and to SAS/R extraction, analysis, error correction, cohort construction, and QC. Current project `AGENTS.md`, `CLAUDE.md`, approved study documents/SAP, active schema, and current environment evidence outrank this reusable skill and generated knowledge.
+Apply this skill to NHIS or HIRA claims-data research design, data requirements/applications, and SAS/R extraction, analysis, error correction, cohort construction, and QC. Current project `AGENTS.md`, `CLAUDE.md`, approved study documents/SAP, active schema, and current environment evidence outrank this reusable skill and generated knowledge.
 
 ## Select the source route first
 
@@ -16,15 +16,26 @@ Before selecting variables, select exactly one route:
 1. **HIRA/심평원** for HIRA extract or analysis.
 2. **NHIS Wonju/on-site extraction** for secure-center server extraction.
 3. **NHIS post-extract analysis** for provided SAS tables processed inside the secure environment or an approved exported layout. Record which delivery stage applies; provided SAS tables do not imply export permission or a universal schema.
+4. **NHIS design/reference lookup or application before delivery** for document-backed requirements. A reference-library task does not imply an active study or application. Follow the design guidance below; do not require live SAS tables to read codebooks or draft a sourced variable list. Select route 2 or 3 before writing environment-specific executable code.
 
-Never mix tokens, table semantics, dates, credentials, extraction commands, or privacy assumptions across routes. If the source or phase is ambiguous, stop before selecting variables and ask for the source, environment, active inventory, study instructions/SAP, extract period, and analysis grain. Continue work that does not depend on those answers, such as reviewing available instructions or preparing the QC outline; do not invent the missing study definitions or schema. Never perform a global search-and-replace between NHIS and HIRA tokens.
+Never mix tokens, table semantics, dates, credentials, extraction commands, or privacy assumptions across routes. If the source or phase is ambiguous, stop before selecting executable fields, inspect available evidence, and ask only for the unresolved source, environment, active inventory, study instructions/SAP, extract period or analysis grain needed by the current step. Continue independent work, including sourced candidates on the design route; do not invent the missing study definitions or schema. Never perform a global search-and-replace between NHIS and HIRA tokens.
 
 ## Start with authority and evidence
 
-1. Read the current project instructions and approved study documents/SAP.
-2. Inspect the active schema and current environment evidence before assuming a table, variable, type, or phase.
-3. Read [references/guardrails.md](references/guardrails.md) before mapping fields or writing extraction/analysis code.
+1. Read the current project instructions and applicable approved study documents/SAP. Shared-reference organization alone does not require an active study or SAP.
+2. For design/reference work, inspect codebooks, year-specific layouts and available application forms as reference metadata; mark request status not applicable when no application is in progress. Inspect the actual study's selected request documents only for an application-status task. For executable mapping, inspect the active schema and current environment evidence before assuming a table, variable, type, or phase.
+3. Read [references/guardrails.md](references/guardrails.md) before mapping fields or writing extraction/analysis code. Its live-inventory checks apply to executable field mapping, not a prerequisite for documenting pre-delivery candidates.
 4. Use generated knowledge only for the selected route and recorded scope. Current evidence outranks generated knowledge.
+
+## Connect design requirements to reference evidence
+
+For NHIS design, variable requirements, code lists, operational definitions or applications, read [references/research-design_20261111.md](references/research-design_20261111.md). Build one table in the existing study document: **research item → table/variable → meaning/value codes → applicable years → request status → source workbook/sheet/cells**. Read available source files before asking the user for variable names. Preserve original names and version/year differences; dictionary inclusion, request selection, approval and delivered availability are distinct.
+
+For shared-reference organization, use the existing catalog instead of assuming a current study. An application form is useful for table/variable names, descriptions and future request locations; it does not mean the user is applying. Mark the request-status column **not applicable — reference only** and do not demand a completed application or treat its absence as unfinished work. Only when an actual application is in scope compare selection cells, requested years and submission/approval evidence.
+
+Follow the current project's designated design/reference catalog first. For an accessible maintained library, use the package locator described below to check the sibling `claims-research-plugin/README.md` section `nhis-design-map-20261111`; it links NHIS_code_book, customized_DB_application and basic/screening/institution layouts by use and sheet. The portable reference works without that library, runtime context or original workbooks. It supplies the workflow, not the source contents: if a required document is absent, identify the missing evidence and continue independent items without inventing names, cells or study definitions.
+
+When that library's `nhis-variable-catalog-20261111` section is available, use its integrated variable CSV/Excel and value-code list as a search index before reopening whole workbooks. Filter by source, table, variable and year; retain record kind, original cell references and conditional code context. Check the source/version against the catalog manifest, then confirm the relevant source cells before adopting a study mapping. Counts are source-specific occurrences, not unique delivered variables. Blank study-item fields, unknown table/year fields and all-variable placeholders are intentional; never fill them by inference. The catalog is a local reference asset, not included in this portable skill.
 
 ## Read applicable code-generation guidance
 
@@ -54,12 +65,16 @@ The checker performs static SAS checks; it does not run SAS/R, inspect real rese
 ## Route static references
 
 - After the HIRA route is selected, read [references/hira-semantic-layer.md](references/hira-semantic-layer.md) for HIRA table, variable, join, or code-matching detail. For any reusable HIRA fact, read [references/hira-evidence.md](references/hira-evidence.md) and revalidate it against the active schema, study SAP, current issue sources, and current environment. Never load or apply the HIRA semantic/evidence files on an NHIS route.
-- After either NHIS route is selected, read [references/nhis-semantic-layer.md](references/nhis-semantic-layer.md) for that phase's tables, fields, and delivery boundaries. After NHIS is selected, read [references/nhis-evidence.md](references/nhis-evidence.md) before relying on or updating a reusable NHIS fact, then revalidate it against the active inventory/layout, approved request contract, study SAP, and current environment. Never load or apply the NHIS semantic/evidence files on a HIRA route.
+- After an NHIS route is selected, read [references/nhis-semantic-layer.md](references/nhis-semantic-layer.md) for that phase's tables, fields, and delivery boundaries. After NHIS is selected, read [references/nhis-evidence.md](references/nhis-evidence.md) before relying on or updating a reusable NHIS fact, then revalidate it against the applicable design documents or active inventory/layout, approved request contract, study SAP, and current environment. Never load or apply the NHIS semantic/evidence files on a HIRA route.
 - Read [references/common-code-qc.md](references/common-code-qc.md) only when the work involves SAS/R code, joins, QC, output, publication, or analytic-validity checks.
 
-Verify `PROC CONTENTS` or an equivalent inventory, types, lengths, missingness, cardinality, and match rates before mapping names. Require explicit clinical definitions and analysis grain. Preserve raw-before-summary dependencies, bounded scans, progress output, and QC checkpoints.
+Verify `PROC CONTENTS` or an equivalent inventory, types, lengths, missingness, cardinality, and match rates before mapping executable fields. Pre-delivery design tables remain document-backed candidates until that check. Require explicit clinical definitions and analysis grain. Preserve raw-before-summary dependencies, bounded scans, progress output, and QC checkpoints.
+
+On the pre-delivery design route, the active-inventory prerequisites in the static semantic/evidence references govern claims about delivered fields and execution. They do not prohibit documenting what an inspected source workbook says. Revalidate those candidates against the actual delivery before executable use.
 
 ## Enforce executable output QC
+
+A document-only design requirements table needs source/cell, year, request-status and consistency checks; it contains metadata, not calculated research results. The numerical release gate below and in common code/QC applies when the artifact includes research counts, derived metrics, estimates or other analytic results. Do not require a production aggregate contract merely to deliver a sourced candidate-variable table, and do not use this distinction to exempt numerical research outputs.
 
 For any task that reviews, finalizes, regenerates, or releases a report, table, CSV/XLSX, SAS/R result, or an unexpectedly small or large value, read [references/common-code-qc.md](references/common-code-qc.md) and apply its executable output-QC gate automatically. Do not wait for the user to name or request the validator.
 

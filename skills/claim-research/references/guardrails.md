@@ -52,9 +52,13 @@ Use this route for provided SAS tables processed inside the secure environment o
 - HbA1c is not a default general-screening item. Do not create it as a covariate/outcome without verified approved availability.
 - Never insert Wonju ODBC/account/USRTMP assumptions into post-extract SAS/R. Separate extraction from analysis.
 
+### Route 4 — NHIS design/application before delivery
+
+For document-backed requirements or shared-reference organization, follow [research-design_20261111.md](research-design_20261111.md). Read available study instructions, codebooks, applicable year-specific layouts and forms used as reference. Record source sheet/cells; when no application is in progress, request status is not applicable rather than missing approval. Actual application work additionally compares the study's request selections and approval evidence, separately from actual delivery. Live SAS inventory is not required to draft sourced candidates; it is required before those candidates become executable field mappings. Missing evidence leaves only the dependent item pending. Choose route 2 or 3 when moving to executable code.
+
 ## Stop on ambiguity
 
-If source or phase is ambiguous, stop before selecting variables. Ask for source, environment, active inventory, study instructions/SAP, extract period, and analysis grain. Verify `PROC CONTENTS` or an equivalent inventory, types, lengths, missingness, cardinality, and match rates before mapping names.
+If source or phase is ambiguous, stop before selecting variables for execution. Inspect available project evidence first, then ask only for unresolved source, environment, active inventory, study instructions/SAP, extract period or analysis grain needed by the current step. Verify `PROC CONTENTS` or an equivalent inventory, types, lengths, missingness, cardinality, and match rates before mapping executable fields. The pre-delivery design route permits sourced candidate tables without claiming actual availability.
 
 ## Revalidate every generated lesson
 
